@@ -1,0 +1,15 @@
+# Minimal requirements for microphone test only
+# This avoids dependency conflicts with docling
+
+# Core audio processing
+sounddevice>=0.4.0
+matplotlib>=3.5.0
+numpy>=1.20.0
+
+# Only the essential MCP dependencies needed for signal processing
+scipy>=1.8.0
+structlog>=22.0.0
+
+# Optional: if you want to test the full MCP stack
+# fastmcp>=0.9.0
+# mcp>=1.0.0
