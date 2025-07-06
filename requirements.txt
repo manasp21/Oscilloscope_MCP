@@ -1,0 +1,42 @@
+# Core MCP and async dependencies
+mcp>=1.0.0
+fastmcp>=0.9.0
+asyncio-mqtt>=0.13.0
+aiofiles>=23.0.0
+
+# Data processing and scientific computing
+numpy>=1.24.0
+scipy>=1.10.0
+pandas>=2.0.0
+
+# Data validation and serialization
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Logging and monitoring
+structlog>=23.0.0
+rich>=13.0.0
+
+# CLI and utilities
+typer>=0.9.0
+click>=8.0.0
+
+# Hardware interface (optional, for future use)
+pyserial>=3.5
+pyusb>=1.2.1; sys_platform != "win32"
+pyvisa>=1.13.0; extra == "hardware"
+pyvisa-py>=0.7.0; extra == "hardware"
+
+# Development dependencies (for local development)
+pytest>=7.0.0; extra == "dev"
+pytest-asyncio>=0.21.0; extra == "dev"
+pytest-cov>=4.0.0; extra == "dev"
+black>=23.0.0; extra == "dev"
+isort>=5.12.0; extra == "dev"
+flake8>=6.0.0; extra == "dev"
+mypy>=1.0.0; extra == "dev"
+pre-commit>=3.0.0; extra == "dev"
+
+# Optional performance dependencies
+numba>=0.57.0; extra == "performance"
+cython>=3.0.0; extra == "performance"
