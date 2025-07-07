@@ -1,6 +1,6 @@
-name: oscilloscope-function-generator
+name: oscilloscope-mcp
 version: 1.0.0
-description: "Professional oscilloscope and function generator MCP server with comprehensive signal processing capabilities"
+description: "Professional oscilloscope and function generator MCP server"
 author: "Oscilloscope MCP Team"
 license: "MIT"
 category: "test-measurement"
@@ -8,7 +8,7 @@ tags: ["oscilloscope", "function-generator", "signal-processing", "measurement",
 
 # Server configuration
 server:
-  command: ["python", "-m", "oscilloscope_mcp.server"]
+  command: ["python", "-m", "oscilloscope_mcp.cli", "serve"]
   env:
     - name: "PYTHONPATH"
       value: "/app/src"

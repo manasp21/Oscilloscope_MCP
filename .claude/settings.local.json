@@ -9,7 +9,10 @@
       "Bash(PYTHONPATH=src python3 -m oscilloscope_mcp.cli test --interface simulation)",
       "Bash(PYTHONPATH=src python3 -m oscilloscope_mcp.cli version)",
       "Bash(rm:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

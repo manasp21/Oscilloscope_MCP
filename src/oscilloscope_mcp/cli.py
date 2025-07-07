@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 import structlog
 
-from .server import OscilloscopeMCPServer
+from .mcp_server import OscilloscopeMCPServer
 
 # Initialize rich console
 console = Console()
