@@ -1,0 +1,83 @@
+# Development and testing files
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+.claude/
+
+# Python cache and temp files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Documentation and examples
+docs/
+examples/
+*.md
+!README.md
+
+# Test files
+tests/
+test_*.py
+*_test.py
+mic_*.py
+microphone_*.py
+
+# Development scripts
+start_*.py
+test_*.py
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+*~
+*.swp
+*.swo
+.vim/
+*.tmp
+*.temp
+
+# Log files
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Requirements for testing/development only
+requirements_mic_test.txt

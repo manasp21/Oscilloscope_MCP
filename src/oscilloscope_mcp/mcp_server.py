@@ -35,6 +35,7 @@ from starlette.websockets import WebSocket
 from .signal_processing.engine import SignalProcessor
 from .measurements.analyzer import MeasurementAnalyzer
 from .protocols.decoder import ProtocolDecoder
+from .hardware.simulation import SimulatedHardware
 
 
 # Configure structured logging
@@ -190,6 +191,9 @@ class OscilloscopeMCPServer:
         self.signal_processor = SignalProcessor()
         self.measurement_analyzer = MeasurementAnalyzer()
         self.protocol_decoder = ProtocolDecoder()
+        
+        # Initialize hardware backend
+        self.hardware = SimulatedHardware()
         
         # Real-time data storage
         self.data_store = DataStore()
@@ -727,6 +731,16 @@ This proves the MCP server can handle real hardware inputs!
         logger.info("Initializing MCP server components")
         
         try:
+            # Initialize hardware backend
+            hardware_config = {
+                "hardware_interface": os.getenv("HARDWARE_INTERFACE", "simulation"),
+                "sample_rate": float(os.getenv("SAMPLE_RATE", "1e6")),
+                "channels": int(os.getenv("CHANNELS", "4")),
+                "buffer_size": int(os.getenv("BUFFER_SIZE", "1000")),
+                "timeout": float(os.getenv("TIMEOUT", "5.0")),
+            }
+            await self.hardware.initialize(hardware_config)
+            
             # Initialize signal processing components
             await self.signal_processor.initialize()
             await self.measurement_analyzer.initialize()
@@ -782,6 +796,10 @@ This proves the MCP server can handle real hardware inputs!
         
         try:
             self.is_running = False
+            
+            # Cleanup hardware backend
+            if self.hardware:
+                await self.hardware.cleanup()
             
             # Cleanup components
             if hasattr(self.signal_processor, 'cleanup'):

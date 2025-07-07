@@ -11,11 +11,9 @@ aiofiles>=23.0.0
 # Data processing and scientific computing
 numpy>=1.24.0
 scipy>=1.10.0
-pandas>=2.0.0
 
 # Data validation and serialization
 pydantic>=2.0.0
-pydantic-settings>=2.0.0
 
 # Logging and monitoring
 structlog>=23.0.0
@@ -23,7 +21,6 @@ rich>=13.0.0
 
 # CLI and utilities
 typer>=0.9.0
-click>=8.0.0
 
 # Hardware interface (optional, for future use)
 pyserial>=3.5

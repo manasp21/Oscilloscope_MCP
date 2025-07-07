@@ -50,6 +50,7 @@ RUN apt-get update && apt-get install -y \
     libblas3 \
     liblapack3 \
     libusb-1.0-0 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -80,8 +81,8 @@ EXPOSE 8080
 USER oscilloscope
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD python -c "import asyncio; import sys; sys.exit(0)"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f --silent --show-error http://localhost:8080/health || exit 1
 
 # Command to run the server
-CMD ["python", "-m", "oscilloscope_mcp.server"]
+CMD ["python", "-m", "oscilloscope_mcp.cli", "serve", "--host", "0.0.0.0", "--port", "8080"]
