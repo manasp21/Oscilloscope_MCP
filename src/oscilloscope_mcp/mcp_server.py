@@ -299,7 +299,7 @@ class OscilloscopeMCPServer:
                     return cached[cache_key]
                 
                 # Get acquisition data
-                waveform_data = await self.data_store.get_acquisition(acquisition_id)
+                waveform_data = await self.context.data_store.get_acquisition(acquisition_id)
                 if not waveform_data:
                     return {
                         "status": "error",
@@ -334,7 +334,7 @@ class OscilloscopeMCPServer:
                     "timestamp": time.time()
                 }
                 
-                await self.data_store.cache_measurements(acquisition_id, cached)
+                await self.context.data_store.cache_measurements(acquisition_id, cached)
                 
                 return cached[cache_key]
                 
@@ -356,8 +356,11 @@ class OscilloscopeMCPServer:
         ) -> Dict[str, Any]:
             """Perform FFT analysis on acquired data."""
             try:
+                if not self.context:
+                    return {"status": "error", "error": "Server not initialized", "timestamp": time.time()}
+                    
                 # Check cache first
-                cached = await self.data_store.get_cached_spectrum(acquisition_id)
+                cached = await self.context.data_store.get_cached_spectrum(acquisition_id)
                 cache_key = f"{channel}_{window}_{resolution}"
                 
                 if cached and cache_key in cached:
@@ -365,7 +368,7 @@ class OscilloscopeMCPServer:
                     return cached[cache_key]
                 
                 # Get acquisition data
-                waveform_data = await self.data_store.get_acquisition(acquisition_id)
+                waveform_data = await self.context.data_store.get_acquisition(acquisition_id)
                 if not waveform_data:
                     return {
                         "status": "error",
@@ -382,7 +385,7 @@ class OscilloscopeMCPServer:
                     }
                 
                 # Perform spectrum analysis
-                spectrum_data = await self.signal_processor.analyze_spectrum(
+                spectrum_data = await self.context.signal_processor.analyze_spectrum(
                     waveform_data=waveform_data,
                     window=window,
                     resolution=resolution
@@ -402,7 +405,7 @@ class OscilloscopeMCPServer:
                     "timestamp": time.time()
                 }
                 
-                await self.data_store.cache_spectrum(acquisition_id, cached)
+                await self.context.data_store.cache_spectrum(acquisition_id, cached)
                 
                 return cached[cache_key]
                 
@@ -464,8 +467,11 @@ class OscilloscopeMCPServer:
                     }
                 )
                 
+                if not self.context:
+                    return {"status": "error", "error": "Server not initialized", "timestamp": time.time()}
+                    
                 # Store as if it came from ADC
-                acquisition_id = await self.data_store.store_adc_data(adc_data)
+                acquisition_id = await self.context.data_store.store_adc_data(adc_data)
                 
                 return {
                     "status": "success",
@@ -499,7 +505,10 @@ class OscilloscopeMCPServer:
         ) -> Dict[str, Any]:
             """Decode digital communication protocols from acquired data."""
             try:
-                waveform_data = await self.data_store.get_acquisition(acquisition_id)
+                if not self.context:
+                    return {"status": "error", "error": "Server not initialized", "timestamp": time.time()}
+                    
+                waveform_data = await self.context.data_store.get_acquisition(acquisition_id)
                 if not waveform_data:
                     return {
                         "status": "error",
@@ -523,7 +532,7 @@ class OscilloscopeMCPServer:
                     }
                 
                 # Perform protocol decoding
-                decoded_data = await self.protocol_decoder.decode_protocol(
+                decoded_data = await self.context.protocol_decoder.decode_protocol(
                     waveform_data={"channels": channel_data},
                     protocol=protocol,
                     settings=settings
@@ -555,7 +564,10 @@ class OscilloscopeMCPServer:
         async def get_waveform_data(acquisition_id: str) -> bytes:
             """Get raw waveform data for an acquisition."""
             try:
-                waveform_data = await self.data_store.get_acquisition(acquisition_id)
+                if not self.context:
+                    return json.dumps({"error": "Server not initialized"}).encode('utf-8')
+                    
+                waveform_data = await self.context.data_store.get_acquisition(acquisition_id)
                 if waveform_data:
                     return json.dumps(waveform_data).encode('utf-8')
                 else:
@@ -569,7 +581,10 @@ class OscilloscopeMCPServer:
         async def get_latest_waveform(channel: int) -> bytes:
             """Get latest waveform data for a specific channel."""
             try:
-                waveform_data = await self.data_store.get_latest_for_channel(channel)
+                if not self.context:
+                    return json.dumps({"error": "Server not initialized"}).encode('utf-8')
+                    
+                waveform_data = await self.context.data_store.get_latest_for_channel(channel)
                 if waveform_data:
                     return json.dumps(waveform_data).encode('utf-8')
                 else:
@@ -653,64 +668,14 @@ This allows any ADC hardware to work with the MCP oscilloscope server!
 This proves the MCP server can handle real hardware inputs!
             """
     
-    async def initialize(self):
-        """Initialize the MCP server components."""
-        logger.info("Initializing MCP server components")
-        
-        try:
-            # Initialize hardware backend
-            hardware_config = {
-                "hardware_interface": os.getenv("HARDWARE_INTERFACE", "simulation"),
-                "sample_rate": float(os.getenv("SAMPLE_RATE", "1e6")),
-                "channels": int(os.getenv("CHANNELS", "4")),
-                "buffer_size": int(os.getenv("BUFFER_SIZE", "1000")),
-                "timeout": float(os.getenv("TIMEOUT", "5.0")),
-            }
-            await self.hardware.initialize(hardware_config)
-            
-            # Initialize signal processing components
-            await self.signal_processor.initialize()
-            await self.measurement_analyzer.initialize()
-            await self.protocol_decoder.initialize()
-            
-            logger.info("MCP server components initialized successfully")
-            return True
-            
-        except Exception as e:
-            logger.error("Failed to initialize MCP server components", error=str(e))
-            return False
-    
-    async def start(self):
-        """Start the MCP server using FastMCP native Streamable HTTP transport."""
-        logger.info("Starting MCP server with Streamable HTTP", host=self.host, port=self.port)
-        
-        try:
-            # Initialize components
-            if not await self.initialize():
-                raise RuntimeError("Failed to initialize server components")
-            
-            self.is_running = True
-            logger.info("MCP server components initialized successfully")
-            
-            # Use FastMCP's native Streamable HTTP transport
-            # This provides the /mcp endpoint that Smithery requires
-            await self.mcp.run_async(
-                transport="http",
-                host=self.host,
-                port=self.port,
-                path="/mcp"
-            )
-            
-        except Exception as e:
-            logger.error("Failed to start MCP server", error=str(e))
-            raise
+    # Removed async initialize and start methods - now handled by lifespan context manager
     
     def run(self):
-        """Run the MCP server using FastMCP native transport (synchronous)."""
+        """Run the MCP server using FastMCP native transport with lifespan management."""
         logger.info("Starting MCP server with Streamable HTTP", host=self.host, port=self.port)
         
         try:
-            # Use FastMCP's native Streamable HTTP transport
+            # Use FastMCP's native Streamable HTTP transport with lifespan for async initialization
             # This provides the /mcp endpoint that Smithery requires
             self.mcp.run(
                 transport="http",
@@ -723,29 +688,10 @@ This proves the MCP server can handle real hardware inputs!
             logger.error("Failed to start MCP server", error=str(e))
             raise
     
-    async def stop(self):
-        """Stop the MCP server."""
-        logger.info("Stopping MCP server")
-        
-        try:
-            self.is_running = False
-            
-            # Cleanup hardware backend
-            if self.hardware:
-                await self.hardware.cleanup()
-            
-            # Cleanup components
-            if hasattr(self.signal_processor, 'cleanup'):
-                await self.signal_processor.cleanup()
-            
-            logger.info("MCP server stopped successfully")
-            
-        except Exception as e:
-            logger.error("Error stopping MCP server", error=str(e))
-            raise
+    # Removed stop method - cleanup now handled by lifespan context manager
 
 
-async def main():
+def main():
     """Main entry point for the MCP server."""
     # Set up logging
     logging.basicConfig(
@@ -754,23 +700,21 @@ async def main():
     )
     
     # Get configuration from environment
-    host = os.getenv("MCP_HOST", "localhost")
-    port = int(os.getenv("MCP_PORT", "8080"))
+    host = os.getenv("MCP_HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8080"))  # Use PORT for Smithery compatibility
     
-    # Create and start server
+    # Create and run server
     server = OscilloscopeMCPServer(host=host, port=port)
     
     try:
-        await server.start()
+        server.run()  # This handles async initialization via lifespan
     except KeyboardInterrupt:
         logger.info("Received interrupt signal")
     except Exception as e:
         logger.error("Server error", error=str(e))
         traceback.print_exc()
         sys.exit(1)
-    finally:
-        await server.stop()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

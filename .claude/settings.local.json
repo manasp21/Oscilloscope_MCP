@@ -15,7 +15,8 @@
       "Bash(rg:*)",
       "WebFetch(domain:docs.smithery.ai)",
       "WebFetch(domain:smithery.ai)",
-      "WebFetch(domain:gofastmcp.com)"
+      "WebFetch(domain:gofastmcp.com)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": []
   }
