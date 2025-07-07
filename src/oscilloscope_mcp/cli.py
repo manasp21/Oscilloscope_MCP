@@ -51,6 +51,8 @@ def serve(
 ):
     """Start the MCP server."""
     console.print("[bold green]Starting Oscilloscope MCP Server[/bold green]")
+    console.print(f"Host: {host}")
+    console.print(f"Port: {port}")
     console.print(f"Interface: {hardware_interface}")
     console.print(f"Log level: {log_level}")
     
@@ -58,8 +60,25 @@ def serve(
     import logging
     logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO))
     
-    # Run the server
-    asyncio.run(run_server(hardware_interface))
+    # Set environment variables for hardware interface
+    import os
+    os.environ["HARDWARE_INTERFACE"] = hardware_interface
+    
+    # Create and run server with FastMCP native transport
+    server = OscilloscopeMCPServer(host=host, port=port)
+    
+    try:
+        console.print("Starting MCP server with FastMCP native transport...")
+        # Use synchronous run method for CLI
+        server.run()
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Received interrupt signal[/yellow]")
+    except Exception as e:
+        console.print(f"[bold red]Server error: {e}[/bold red]")
+        logger.error("Server error", error=str(e))
+        sys.exit(1)
+    finally:
+        console.print("[green]Server stopped[/green]")
 
 @app.command()
 def test(
@@ -114,24 +133,7 @@ def version():
     console.print(f"Oscilloscope MCP Server v{__version__}")
     console.print(__description__)
 
-async def run_server(hardware_interface: str):
-    """Run the MCP server."""
-    server = OscilloscopeMCPServer()
-    
-    try:
-        console.print("Initializing server...")
-        await server.start()
-        
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Received interrupt signal[/yellow]")
-    except Exception as e:
-        console.print(f"[bold red]Server error: {e}[/bold red]")
-        logger.error("Server error", error=str(e))
-        sys.exit(1)
-    finally:
-        console.print("Shutting down server...")
-        await server.stop()
-        console.print("[green]Server stopped[/green]")
+# Removed run_server function - now handled directly in serve command with FastMCP native transport
 
 def main():
     """Main entry point."""

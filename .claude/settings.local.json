@@ -12,7 +12,10 @@
       "Bash(git config:*)",
       "Bash(grep:*)",
       "Bash(find:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "WebFetch(domain:docs.smithery.ai)",
+      "WebFetch(domain:smithery.ai)",
+      "WebFetch(domain:gofastmcp.com)"
     ],
     "deny": []
   }

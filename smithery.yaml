@@ -323,15 +323,11 @@ build:
   dockerfile: "Dockerfile"
   context: "."
   
-# Runtime configuration
-runtime:
+# Runtime configuration - Required for Smithery deployment
+runtime: "container"
+resources:
   memory: "1Gi"
   cpu: "1000m"
   timeout: 300
   
-# Health check
-health:
-  path: "/health"
-  interval: 30
-  timeout: 5
-  retries: 3
+# Health check removed - Smithery uses /mcp endpoint for health checking

@@ -180,9 +180,10 @@ class DataStore:
 class OscilloscopeMCPServer:
     """Real MCP server for oscilloscope and function generator."""
     
-    def __init__(self, host: str = "localhost", port: int = 8080):
+    def __init__(self, host: str = "0.0.0.0", port: Optional[int] = None):
         self.host = host
-        self.port = port
+        # Use PORT environment variable as required by Smithery
+        self.port = port or int(os.getenv("PORT", "8080"))
         
         # Initialize MCP server
         self.mcp = FastMCP("oscilloscope-function-generator")
@@ -212,8 +213,7 @@ class OscilloscopeMCPServer:
         self._register_resources()
         self._register_prompts()
         
-        # Create additional HTTP routes for ADC data ingestion
-        self._setup_adc_routes()
+        # Note: ADC data ingestion will be handled through MCP tools instead of custom HTTP routes
         
         logger.info("MCP server initialized", host=host, port=port, config=self.config)
     
@@ -227,82 +227,9 @@ class OscilloscopeMCPServer:
             "cors_origins": os.getenv("CORS_ORIGINS", "*").split(","),
         }
     
-    def _setup_adc_routes(self):
-        """Setup additional HTTP routes for ADC data ingestion."""
-        
-        async def health_check(request):
-            """Health check endpoint."""
-            return JSONResponse({
-                "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat(),
-                "version": "1.0.0",
-                "acquisitions_count": len(self.data_store.acquisitions),
-                "connected_clients": len(self.connected_clients)
-            })
-        
-        async def adc_data_ingestion(request):
-            """HTTP endpoint for ADC data ingestion."""
-            try:
-                data_json = await request.json()
-                adc_data = ADCDataBatch(**data_json)
-                
-                # Store the data
-                acquisition_id = await self.data_store.store_adc_data(adc_data)
-                
-                return JSONResponse({
-                    "status": "success",
-                    "acquisition_id": acquisition_id,
-                    "timestamp": time.time()
-                })
-                
-            except Exception as e:
-                logger.error("ADC data ingestion failed", error=str(e))
-                return JSONResponse({
-                    "status": "error",
-                    "error": str(e),
-                    "timestamp": time.time()
-                }, status_code=400)
-        
-        async def websocket_adc_endpoint(websocket):
-            """WebSocket endpoint for real-time ADC data streaming."""
-            await websocket.accept()
-            client_id = f"client_{uuid.uuid4().hex[:8]}"
-            self.connected_clients.add(client_id)
-            
-            logger.info("WebSocket client connected", client_id=client_id)
-            
-            try:
-                while True:
-                    # Receive ADC data via WebSocket
-                    data_json = await websocket.receive_json()
-                    adc_data = ADCDataBatch(**data_json)
-                    
-                    # Store the data
-                    acquisition_id = await self.data_store.store_adc_data(adc_data)
-                    
-                    # Send confirmation back
-                    await websocket.send_json({
-                        "status": "received",
-                        "acquisition_id": acquisition_id,
-                        "timestamp": time.time()
-                    })
-                    
-            except Exception as e:
-                logger.error("WebSocket error", client_id=client_id, error=str(e))
-            finally:
-                self.connected_clients.discard(client_id)
-                logger.info("WebSocket client disconnected", client_id=client_id)
-        
-        # Add routes to FastMCP app
-        self.additional_routes = [
-            Route("/health", health_check, methods=["GET"]),
-            Route("/adc/data", adc_data_ingestion, methods=["POST"]),
-        ]
-        
-        if self.config["enable_websocket"]:
-            self.additional_routes.append(
-                WebSocketRoute("/adc/stream", websocket_adc_endpoint)
-            )
+    # NOTE: Custom HTTP routes removed - using FastMCP native transport
+    # ADC data ingestion will be handled through MCP tools instead of custom endpoints
+    # This ensures compatibility with Smithery's required /mcp endpoint
     
     def _register_oscilloscope_tools(self):
         """Register oscilloscope MCP tools."""
@@ -754,37 +681,43 @@ This proves the MCP server can handle real hardware inputs!
             return False
     
     async def start(self):
-        """Start the MCP server."""
-        logger.info("Starting MCP server", host=self.host, port=self.port)
+        """Start the MCP server using FastMCP native Streamable HTTP transport."""
+        logger.info("Starting MCP server with Streamable HTTP", host=self.host, port=self.port)
         
         try:
             # Initialize components
             if not await self.initialize():
                 raise RuntimeError("Failed to initialize server components")
             
-            # Create the ASGI app with additional routes
-            app = self.mcp.create_app()
-            
-            # Add our custom routes
-            for route in self.additional_routes:
-                app.routes.append(route)
-            
             self.is_running = True
-            logger.info("MCP server started successfully", 
-                       host=self.host, port=self.port,
-                       websocket_enabled=self.config["enable_websocket"])
+            logger.info("MCP server components initialized successfully")
             
-            # Run the server
-            uvicorn_config = uvicorn.Config(
-                app,
+            # Use FastMCP's native Streamable HTTP transport
+            # This provides the /mcp endpoint that Smithery requires
+            await self.mcp.run_async(
+                transport="http",
                 host=self.host,
                 port=self.port,
-                log_level=self.config["log_level"].lower(),
-                access_log=True
+                path="/mcp"
             )
             
-            server = uvicorn.Server(uvicorn_config)
-            await server.serve()
+        except Exception as e:
+            logger.error("Failed to start MCP server", error=str(e))
+            raise
+    
+    def run(self):
+        """Run the MCP server using FastMCP native transport (synchronous)."""
+        logger.info("Starting MCP server with Streamable HTTP", host=self.host, port=self.port)
+        
+        try:
+            # Use FastMCP's native Streamable HTTP transport
+            # This provides the /mcp endpoint that Smithery requires
+            self.mcp.run(
+                transport="http",
+                host=self.host,
+                port=self.port,
+                path="/mcp"
+            )
             
         except Exception as e:
             logger.error("Failed to start MCP server", error=str(e))

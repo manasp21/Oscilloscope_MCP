@@ -77,7 +77,7 @@ ENV PYTHONUNBUFFERED=1 \
     LOG_LEVEL=INFO \
     HARDWARE_INTERFACE=simulation
 
-# Expose health check port
+# Expose MCP server port
 EXPOSE 8080
 
 # Verify package is available in production stage
@@ -86,9 +86,7 @@ RUN python -c "import oscilloscope_mcp; print(f'Production stage - Package avail
 # Switch to non-root user
 USER oscilloscope
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f --max-time 8 http://localhost:8080/health | grep -q "healthy" || exit 1
+# Health check removed - Smithery uses /mcp endpoint for health checking
 
 # Command to run the server
 CMD ["sh", "-c", "echo 'Starting Oscilloscope MCP Server...' && python -c 'import oscilloscope_mcp; print(f\"Module check OK: v{oscilloscope_mcp.__version__}\")' && python -m oscilloscope_mcp.cli serve --host 0.0.0.0 --port 8080"]
