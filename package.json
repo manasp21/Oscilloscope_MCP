@@ -1,0 +1,46 @@
+{
+  "name": "oscilloscope-mcp-server",
+  "version": "1.0.0",
+  "description": "Professional oscilloscope and function generator MCP server with hardware ADC integration",
+  "type": "module",
+  "main": "dist/server.js",
+  "module": "src/server.ts",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "smithery:dev": "npx @smithery/cli dev",
+    "smithery:build": "npx @smithery/cli build"
+  },
+  "keywords": [
+    "mcp",
+    "oscilloscope",
+    "function-generator",
+    "adc",
+    "hardware",
+    "smithery"
+  ],
+  "author": "Manas Pandey",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@smithery/sdk": "^1.5.2",
+    "okay-error": "^1.0.2",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

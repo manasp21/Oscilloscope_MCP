@@ -1,57 +1,28 @@
-# Development and testing files
-.git/
-.gitignore
-.github/
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+
+# Development files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and editor files
 .vscode/
 .idea/
-.claude/
+*.swp
+*.swo
+*~
 
-# Python cache and temp files
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-ENV/
-env.bak/
-venv.bak/
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-
-# Documentation and examples
-docs/
-examples/
-*.md
-!README.md
-
-# Test files
-tests/
-test_*.py
-*_test.py
-mic_*.py
-microphone_*.py
-
-# Development scripts
-start_*.py
-test_*.py
-
-# Build artifacts
-build/
-dist/
-*.egg-info/
-.eggs/
-
-# OS files
+# OS generated files
 .DS_Store
 .DS_Store?
 ._*
@@ -60,24 +31,80 @@ dist/
 ehthumbs.db
 Thumbs.db
 
-# Editor files
-*~
-*.swp
-*.swo
-.vim/
-*.tmp
-*.temp
+# Git
+.git/
+.gitignore
 
-# Log files
-*.log
-logs/
+# Documentation
+docs/
+*.md
+CHANGELOG.md
+LICENSE
 
-# Environment files
-.env
-.env.local
-.env.development
-.env.test
-.env.production
+# Test files
+tests/
+test/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+coverage/
 
-# Requirements for testing/development only
+# Python files (legacy)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv
+.coverage
+.pytest_cache/
+*.egg-info/
+dist-py/
+build-py/
+pyproject.toml
+requirements.txt
 requirements_mic_test.txt
+src/oscilloscope_mcp/
+start_mcp_server.py
+test_mcp_server.py
+mic_*.py
+microphone_mcp_client.py
+
+# Examples and test scripts
+examples/
+*.example
+mic_test.py
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+
+# Smithery build cache
+.smithery/

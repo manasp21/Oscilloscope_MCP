@@ -1,333 +1,80 @@
 name: oscilloscope-mcp
 version: 1.0.0
-description: "Professional oscilloscope and function generator MCP server"
+description: "Professional oscilloscope and function generator MCP server with hardware ADC integration"
 author: "Oscilloscope MCP Team"
 license: "MIT"
 category: "test-measurement"
-tags: ["oscilloscope", "function-generator", "signal-processing", "measurement", "analysis"]
+tags: ["oscilloscope", "function-generator", "signal-processing", "measurement", "analysis", "adc", "hardware"]
 
-# Server configuration
-server:
-  command: ["python", "-m", "oscilloscope_mcp.cli", "serve", "--host", "0.0.0.0", "--port", "8080"]
-  env:
-    - name: "PYTHONPATH"
-      value: "/app/src"
-    - name: "LOG_LEVEL"
-      value: "INFO"
-    - name: "HARDWARE_INTERFACE"
-      value: "simulation"  # Can be overridden to "usb", "ethernet", etc.
-
-# MCP Tools - Oscilloscope capabilities
-tools:
-  # Channel Configuration
-  - name: "configure_channels"
-    description: "Configure oscilloscope input channels with voltage range, coupling, and impedance"
-    parameters:
-      - name: "channels"
-        type: "array"
-        description: "List of channel numbers to configure"
-      - name: "voltage_range"
-        type: "number"
-        description: "Voltage range per division in volts"
-      - name: "coupling"
-        type: "string"
-        description: "Input coupling: AC, DC, or GND"
-      - name: "impedance"
-        type: "string"
-        description: "Input impedance: 50Ω or 1MΩ"
-
-  # Timebase Configuration
-  - name: "set_timebase"
-    description: "Configure acquisition timebase and record length"
-    parameters:
-      - name: "sample_rate"
-        type: "number"
-        description: "Sample rate in Hz"
-      - name: "record_length"
-        type: "integer"
-        description: "Number of samples to acquire"
-
-  # Trigger Configuration
-  - name: "setup_trigger"
-    description: "Configure trigger conditions for signal acquisition"
-    parameters:
-      - name: "source"
-        type: "string"
-        description: "Trigger source channel"
-      - name: "type"
-        type: "string"
-        description: "Trigger type: edge, pulse, pattern, etc."
-      - name: "level"
-        type: "number"
-        description: "Trigger level in volts"
-      - name: "edge"
-        type: "string"
-        description: "Trigger edge: rising, falling, or both"
-
-  # Data Acquisition
-  - name: "acquire_waveform"
-    description: "Acquire waveform data from specified channels"
-    parameters:
-      - name: "channels"
-        type: "array"
-        description: "List of channels to acquire"
-      - name: "timeout"
-        type: "number"
-        description: "Acquisition timeout in seconds"
-
-  # Measurements
-  - name: "measure_parameters"
-    description: "Perform automated measurements on acquired waveforms"
-    parameters:
-      - name: "channel"
-        type: "integer"
-        description: "Channel number for measurement"
-      - name: "measurements"
-        type: "array"
-        description: "List of measurements: rms, peak_to_peak, frequency, etc."
-
-  - name: "analyze_spectrum"
-    description: "Perform FFT analysis with windowing and resolution control"
-    parameters:
-      - name: "channel"
-        type: "integer"
-        description: "Channel number for analysis"
-      - name: "window"
-        type: "string"
-        description: "Window function: hamming, blackman, etc."
-      - name: "resolution"
-        type: "integer"
-        description: "FFT resolution (number of bins)"
-
-  # Protocol Analysis
-  - name: "decode_protocol"
-    description: "Decode digital communication protocols"
-    parameters:
-      - name: "channels"
-        type: "array"
-        description: "Channels containing protocol signals"
-      - name: "protocol"
-        type: "string"
-        description: "Protocol type: UART, SPI, I2C, CAN, etc."
-      - name: "settings"
-        type: "object"
-        description: "Protocol-specific settings (baud rate, etc.)"
-
-  # Function Generator Tools
-  - name: "generate_standard_waveform"
-    description: "Generate standard waveforms (sine, square, triangle, etc.)"
-    parameters:
-      - name: "channel"
-        type: "integer"
-        description: "Output channel number"
-      - name: "waveform"
-        type: "string"
-        description: "Waveform type: sine, square, triangle, sawtooth, etc."
-      - name: "frequency"
-        type: "number"
-        description: "Frequency in Hz"
-      - name: "amplitude"
-        type: "number"
-        description: "Amplitude in volts"
-      - name: "offset"
-        type: "number"
-        description: "DC offset in volts"
-
-  - name: "generate_arbitrary_waveform"
-    description: "Generate arbitrary waveform from sample data"
-    parameters:
-      - name: "channel"
-        type: "integer"
-        description: "Output channel number"
-      - name: "samples"
-        type: "array"
-        description: "Array of sample values"
-      - name: "sample_rate"
-        type: "number"
-        description: "Sample rate in Hz"
-
-  - name: "configure_modulation"
-    description: "Configure amplitude, frequency, or phase modulation"
-    parameters:
-      - name: "channel"
-        type: "integer"
-        description: "Output channel number"
-      - name: "mod_type"
-        type: "string"
-        description: "Modulation type: AM, FM, PM"
-      - name: "carrier_freq"
-        type: "number"
-        description: "Carrier frequency in Hz"
-      - name: "mod_params"
-        type: "object"
-        description: "Modulation parameters"
-
-  - name: "setup_sweep"
-    description: "Configure frequency sweep generation"
-    parameters:
-      - name: "channel"
-        type: "integer"
-        description: "Output channel number"
-      - name: "start_freq"
-        type: "number"
-        description: "Start frequency in Hz"
-      - name: "stop_freq"
-        type: "number"
-        description: "Stop frequency in Hz"
-      - name: "sweep_time"
-        type: "number"
-        description: "Sweep duration in seconds"
-
-  # Advanced Analysis
-  - name: "cross_correlate_signals"
-    description: "Cross-correlation analysis between two channels"
-    parameters:
-      - name: "channel1"
-        type: "integer"
-        description: "First channel number"
-      - name: "channel2"
-        type: "integer"
-        description: "Second channel number"
-
-  - name: "calculate_transfer_function"
-    description: "Calculate system transfer function H(f) = Output/Input"
-    parameters:
-      - name: "input_channel"
-        type: "integer"
-        description: "Input signal channel"
-      - name: "output_channel"
-        type: "integer"
-        description: "Output signal channel"
-
-  - name: "detect_glitches"
-    description: "Detect signal glitches and anomalies"
-    parameters:
-      - name: "channel"
-        type: "integer"
-        description: "Channel to analyze"
-      - name: "threshold"
-        type: "number"
-        description: "Glitch detection threshold"
-      - name: "duration"
-        type: "number"
-        description: "Minimum glitch duration"
-
-  - name: "measure_power_spectrum"
-    description: "Measure power spectral density"
-    parameters:
-      - name: "channel"
-        type: "integer"
-        description: "Channel number"
-      - name: "frequency_range"
-        type: "array"
-        description: "Frequency range [start, stop] in Hz"
-
-# MCP Resources - Data access
-resources:
-  - name: "waveform_data"
-    description: "Real-time access to acquired waveform data"
-    uri_template: "waveform://channel{channel}/buffer"
-    
-  - name: "spectrum_data"
-    description: "Access to FFT analysis results"
-    uri_template: "spectrum://channel{channel}/fft"
-    
-  - name: "measurement_results"
-    description: "Access to measurement results and statistics"
-    uri_template: "measurements://channel{channel}/results"
-    
-  - name: "instrument_config"
-    description: "Current instrument configuration and settings"
-    uri_template: "config://instrument/settings"
-    
-  - name: "calibration_data"
-    description: "Calibration coefficients and compensation data"
-    uri_template: "config://calibration/data"
-    
-  - name: "protocol_decode_results"
-    description: "Decoded protocol data and analysis"
-    uri_template: "protocol://decode/{protocol}/results"
-
-# MCP Prompts - Measurement workflows
-prompts:
-  - name: "oscilloscope_basic_setup"
-    description: "Basic oscilloscope setup procedure for common measurements"
-    template: |
-      Follow this procedure to set up the oscilloscope for basic measurements:
-      
-      1. Configure input channels for your signal levels
-      2. Set appropriate timebase for signal observation
-      3. Configure trigger conditions for stable display
-      4. Acquire waveform data
-      5. Perform standard measurements (amplitude, frequency, etc.)
-      
-      Use the following tools in sequence:
-      - configure_channels()
-      - set_timebase()
-      - setup_trigger()
-      - acquire_waveform()
-      - measure_parameters()
-
-  - name: "signal_integrity_analysis"
-    description: "Comprehensive signal integrity analysis workflow"
-    template: |
-      Complete signal integrity analysis procedure:
-      
-      1. Acquire high-resolution waveform data
-      2. Measure rise/fall times and overshoot
-      3. Analyze frequency spectrum for harmonics
-      4. Check for jitter and timing anomalies
-      5. Perform eye diagram analysis if applicable
-      
-      Tools to use:
-      - acquire_waveform() with high sample rate
-      - measure_parameters() for timing measurements
-      - analyze_spectrum() for frequency analysis
-      - detect_glitches() for anomaly detection
-
-  - name: "frequency_response_analysis"
-    description: "Automated frequency response measurement workflow"
-    template: |
-      Frequency response analysis procedure:
-      
-      1. Configure function generator for swept sine wave
-      2. Set up oscilloscope for input and output measurement
-      3. Perform frequency sweep
-      4. Calculate transfer function at each frequency
-      5. Generate Bode plot data
-      
-      Required tools:
-      - setup_sweep() for function generator
-      - acquire_waveform() for both channels
-      - calculate_transfer_function() for analysis
-
-  - name: "protocol_debug_procedure"
-    description: "Digital protocol debugging and analysis procedure"
-    template: |
-      Protocol debugging workflow:
-      
-      1. Configure channels for protocol signals
-      2. Set up appropriate trigger conditions
-      3. Acquire sufficient data for analysis
-      4. Decode protocol messages
-      5. Analyze timing and signal integrity
-      
-      Tools sequence:
-      - configure_channels() for digital signals
-      - setup_trigger() for protocol events
-      - acquire_waveform() for data capture
-      - decode_protocol() for message analysis
+# Runtime configuration - Required for Smithery deployment
+runtime: "container"
 
 # Build configuration
 build:
   dockerfile: "Dockerfile"
-  context: "."
-  
-# Runtime configuration - Required for Smithery deployment
-runtime: "container"
+  dockerBuildPath: "."
+
+# Start command configuration for HTTP MCP server
+startCommand:
+  type: "http"
+  configSchema:
+    type: "object"
+    properties:
+      hardwareInterface:
+        type: "string"
+        title: "Hardware Interface"
+        description: "Hardware interface type for ADC"
+        default: "simulation"
+        enum: ["simulation", "usb", "ethernet", "pcie"]
+      sampleRate:
+        type: "number"
+        title: "Sample Rate"
+        description: "ADC sample rate in Hz"
+        default: 1000000
+        minimum: 1000
+        maximum: 100000000
+      channels:
+        type: "integer"
+        title: "Number of Channels"
+        description: "Number of ADC channels"
+        default: 4
+        minimum: 1
+        maximum: 16
+      bufferSize:
+        type: "integer"
+        title: "Buffer Size"
+        description: "Buffer size for data acquisition"
+        default: 1000
+        minimum: 100
+        maximum: 1000000
+      timeout:
+        type: "number"
+        title: "Operation Timeout"
+        description: "Timeout for operations in seconds"
+        default: 5.0
+        minimum: 1.0
+        maximum: 60.0
+      debug:
+        type: "boolean"
+        title: "Debug Logging"
+        description: "Enable debug logging"
+        default: false
+  exampleConfig:
+    hardwareInterface: "simulation"
+    sampleRate: 1000000
+    channels: 4
+    bufferSize: 1000
+    timeout: 5.0
+    debug: false
+
+# Resource configuration
 resources:
   memory: "1Gi"
   cpu: "1000m"
   timeout: 300
-  
-# Health check removed - Smithery uses /mcp endpoint for health checking
+
+# Environment variables for container
+env:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  HARDWARE_INTERFACE: "simulation"

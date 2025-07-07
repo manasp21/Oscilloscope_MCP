@@ -16,7 +16,20 @@
       "WebFetch(domain:docs.smithery.ai)",
       "WebFetch(domain:smithery.ai)",
       "WebFetch(domain:gofastmcp.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "mcp__context-7__resolve-library-id",
+      "mcp__context-7__get-library-docs",
+      "Bash(touch:*)",
+      "Bash(npm install:*)",
+      "Bash(npm view:*)",
+      "Bash(npm run build:*)",
+      "Bash(sed:*)",
+      "Bash(PORT=8081 npm start)",
+      "Bash(timeout 10s bash -c 'PORT=8081 npm start')",
+      "Bash(timeout 15s bash -c 'PORT=8081 npm start')",
+      "Bash(timeout 15s bash -c 'npm run smithery:dev')",
+      "Bash(npm run:*)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }
