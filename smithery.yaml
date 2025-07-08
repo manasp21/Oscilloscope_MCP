@@ -6,75 +6,10 @@ license: "MIT"
 category: "test-measurement"
 tags: ["oscilloscope", "function-generator", "signal-processing", "measurement", "analysis", "adc", "hardware"]
 
-# Runtime configuration - Required for Smithery deployment
-runtime: "container"
+# Runtime configuration - TypeScript runtime for Smithery deployment
+runtime: "typescript"
 
-# Build configuration
-build:
-  dockerfile: "Dockerfile"
-  dockerBuildPath: "."
-
-# Start command configuration for HTTP MCP server
-startCommand:
-  type: "http"
-  configSchema:
-    type: "object"
-    properties:
-      hardwareInterface:
-        type: "string"
-        title: "Hardware Interface"
-        description: "Hardware interface type for ADC"
-        default: "simulation"
-        enum: ["simulation", "usb", "ethernet", "pcie"]
-      sampleRate:
-        type: "number"
-        title: "Sample Rate"
-        description: "ADC sample rate in Hz"
-        default: 1000000
-        minimum: 1000
-        maximum: 100000000
-      channels:
-        type: "integer"
-        title: "Number of Channels"
-        description: "Number of ADC channels"
-        default: 4
-        minimum: 1
-        maximum: 16
-      bufferSize:
-        type: "integer"
-        title: "Buffer Size"
-        description: "Buffer size for data acquisition"
-        default: 1000
-        minimum: 100
-        maximum: 1000000
-      timeout:
-        type: "number"
-        title: "Operation Timeout"
-        description: "Timeout for operations in seconds"
-        default: 5.0
-        minimum: 1.0
-        maximum: 60.0
-      debug:
-        type: "boolean"
-        title: "Debug Logging"
-        description: "Enable debug logging"
-        default: false
-  exampleConfig:
-    hardwareInterface: "simulation"
-    sampleRate: 1000000
-    channels: 4
-    bufferSize: 1000
-    timeout: 5.0
-    debug: false
-
-# Resource configuration
-resources:
-  memory: "1Gi"
-  cpu: "1000m"
-  timeout: 300
-
-# Environment variables for container
+# Optional environment variables
 env:
-  NODE_ENV: "production"
   LOG_LEVEL: "info"
   HARDWARE_INTERFACE: "simulation"

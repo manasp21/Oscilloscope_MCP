@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Professional oscilloscope and function generator MCP server with hardware ADC integration",
   "type": "module",
-  "main": "dist/server.js",
-  "module": "src/server.ts",
+  "main": "dist/index.js",
+  "module": "src/index.ts",
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
@@ -26,8 +26,6 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@smithery/sdk": "^1.5.2",
-    "okay-error": "^1.0.2",
     "zod": "^3.22.0"
   },
   "devDependencies": {

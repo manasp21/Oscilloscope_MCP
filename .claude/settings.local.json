@@ -29,7 +29,9 @@
       "Bash(timeout 15s bash -c 'PORT=8081 npm start')",
       "Bash(timeout 15s bash -c 'npm run smithery:dev')",
       "Bash(npm run:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": []
   }
