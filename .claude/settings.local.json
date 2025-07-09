@@ -37,7 +37,9 @@
       "Bash(HARDWARE_INTERFACE=microphone AUDIO_SAMPLE_RATE=44100 DEBUG=false timeout 5 npm run start)",
       "Bash(HARDWARE_INTERFACE=microphone AUDIO_SAMPLE_RATE=44100 timeout 5 npm run start)",
       "Bash(HARDWARE_INTERFACE=microphone AUDIO_SAMPLE_RATE=44100 MCP_MODE=false timeout 5 node dist/index.js)",
-      "Bash(HARDWARE_INTERFACE=microphone AUDIO_SAMPLE_RATE=44100 MCP_MODE=true timeout 5 node dist/index.js)"
+      "Bash(HARDWARE_INTERFACE=microphone AUDIO_SAMPLE_RATE=44100 MCP_MODE=true timeout 5 node dist/index.js)",
+      "Bash(HARDWARE_INTERFACE=microphone timeout 10 node dist/index.js)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

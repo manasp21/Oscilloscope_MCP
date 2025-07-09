@@ -195,13 +195,12 @@ class HardwareInterface {
       const sampleRate = this.config.audioSampleRate || 44100;
       const expectedSamples = Math.floor(sampleRate * durationSeconds);
       
-      const micStream = this.microphone.getAudioStream();
-
+      let micStream: any;
       let timeout: NodeJS.Timeout;
 
       const cleanup = () => {
         if (timeout) clearTimeout(timeout);
-        this.microphone.stop();
+        this.microphone.stopRecording();
       };
 
       timeout = setTimeout(() => {
@@ -213,27 +212,27 @@ class HardwareInterface {
         }
       }, (durationSeconds + 1) * 1000);
 
-      micStream.on('data', (chunk: Buffer) => {
-        // Convert 16-bit PCM to normalized float values
-        for (let i = 0; i < chunk.length; i += 2) {
-          const sample = chunk.readInt16LE(i) / 32768.0;
-          samples.push(sample);
-          
-          if (samples.length >= expectedSamples) {
-            cleanup();
-            resolve(samples.slice(0, expectedSamples));
-            return;
-          }
-        }
-      });
-
-      micStream.on('error', (error: Error) => {
-        cleanup();
-        reject(error);
-      });
-
       try {
-        this.microphone.start();
+        micStream = this.microphone.startRecording();
+        
+        micStream.on('data', (chunk: Buffer) => {
+          // Convert 16-bit PCM to normalized float values
+          for (let i = 0; i < chunk.length; i += 2) {
+            const sample = chunk.readInt16LE(i) / 32768.0;
+            samples.push(sample);
+            
+            if (samples.length >= expectedSamples) {
+              cleanup();
+              resolve(samples.slice(0, expectedSamples));
+              return;
+            }
+          }
+        });
+
+        micStream.on('error', (error: Error) => {
+          cleanup();
+          reject(error);
+        });
       } catch (error) {
         cleanup();
         reject(error);
@@ -243,7 +242,7 @@ class HardwareInterface {
 
   stopCapture(): void {
     if (this.microphone) {
-      this.microphone.stop();
+      this.microphone.stopRecording();
       this.isCapturing = false;
     }
   }
@@ -260,22 +259,80 @@ class HardwareInterface {
  */
 class SignalProcessor {
   async analyzeSpectrum(waveformData: any, window: string, resolution: number): Promise<any> {
-    // Generate mock spectrum data for simulation
-    const result: any = {
-      frequencies: [],
-      magnitude: [],
-      phase: [],
+    const samples = waveformData.channels[0] || [];
+    const sampleRate = waveformData.sample_rate || 44100;
+    
+    if (samples.length === 0) {
+      throw new Error('No signal data available for spectrum analysis');
+    }
+
+    // Apply windowing function
+    const windowedSamples = this.applyWindow(samples, window);
+    
+    // Perform FFT
+    const fft = this.performFFT(windowedSamples, resolution);
+    
+    // Calculate frequency bins
+    const frequencies = [];
+    const magnitude = [];
+    const phase = [];
+    
+    const binSize = sampleRate / (2 * resolution);
+    
+    for (let i = 0; i < resolution; i++) {
+      frequencies.push(i * binSize);
+      magnitude.push(Math.sqrt(fft.real[i] * fft.real[i] + fft.imag[i] * fft.imag[i]));
+      phase.push(Math.atan2(fft.imag[i], fft.real[i]));
+    }
+
+    return {
+      frequencies,
+      magnitude,
+      phase,
       window_used: window,
       resolution: resolution
     };
+  }
 
-    for (let i = 0; i < resolution; i++) {
-      result.frequencies.push(i * 100); // Mock frequency bins
-      result.magnitude.push(Math.random() * 100); // Mock magnitude
-      result.phase.push(Math.random() * 2 * Math.PI); // Mock phase
+  private applyWindow(samples: number[], windowType: string): number[] {
+    const N = samples.length;
+    const windowed = new Array(N);
+    
+    switch (windowType.toLowerCase()) {
+      case 'hamming':
+        for (let i = 0; i < N; i++) {
+          windowed[i] = samples[i] * (0.54 - 0.46 * Math.cos(2 * Math.PI * i / (N - 1)));
+        }
+        break;
+      case 'hanning':
+        for (let i = 0; i < N; i++) {
+          windowed[i] = samples[i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)));
+        }
+        break;
+      case 'rectangular':
+      default:
+        return samples.slice();
     }
+    
+    return windowed;
+  }
 
-    return result;
+  private performFFT(samples: number[], resolution: number): { real: number[], imag: number[] } {
+    // Simple FFT implementation for basic functionality
+    const N = Math.min(samples.length, resolution * 2);
+    const real = new Array(resolution).fill(0);
+    const imag = new Array(resolution).fill(0);
+    
+    // DFT calculation for frequency domain analysis
+    for (let k = 0; k < resolution; k++) {
+      for (let n = 0; n < N; n++) {
+        const angle = -2 * Math.PI * k * n / N;
+        real[k] += samples[n] * Math.cos(angle);
+        imag[k] += samples[n] * Math.sin(angle);
+      }
+    }
+    
+    return { real, imag };
   }
 }
 
@@ -285,39 +342,103 @@ class SignalProcessor {
 class MeasurementAnalyzer {
   async measureParameters(waveformData: any, measurements: string[], statistics: boolean): Promise<any> {
     const results: any = {};
+    const samples = waveformData.channels[0] || [];
+    const sampleRate = waveformData.sample_rate || 44100;
+
+    if (samples.length === 0) {
+      throw new Error('No signal data available for measurements');
+    }
 
     for (const measurement of measurements) {
       switch (measurement) {
         case "frequency":
-          results[measurement] = 1000 + Math.random() * 1000;
+          results[measurement] = this.measureFrequency(samples, sampleRate);
           break;
         case "amplitude":
-          results[measurement] = 1.0 + Math.random() * 2.0;
+          results[measurement] = this.measureAmplitude(samples);
           break;
         case "peak_to_peak":
-          results[measurement] = 2.0 + Math.random() * 4.0;
+          results[measurement] = this.measurePeakToPeak(samples);
           break;
         case "rms":
-          results[measurement] = 0.707 + Math.random() * 0.5;
+          results[measurement] = this.measureRMS(samples);
           break;
         case "duty_cycle":
-          results[measurement] = 50 + Math.random() * 10;
+          results[measurement] = this.measureDutyCycle(samples);
           break;
         default:
-          results[measurement] = Math.random() * 100;
+          results[measurement] = 0;
       }
 
       if (statistics) {
-        results[`${measurement}_stats`] = {
-          min: results[measurement] * 0.9,
-          max: results[measurement] * 1.1,
-          mean: results[measurement],
-          std: results[measurement] * 0.05
-        };
+        results[`${measurement}_stats`] = this.calculateStatistics(samples, results[measurement]);
       }
     }
 
     return results;
+  }
+
+  private measureFrequency(samples: number[], sampleRate: number): number {
+    // Use zero-crossing detection for frequency measurement
+    let crossings = 0;
+    let lastSign = samples[0] >= 0 ? 1 : -1;
+    
+    for (let i = 1; i < samples.length; i++) {
+      const currentSign = samples[i] >= 0 ? 1 : -1;
+      if (currentSign !== lastSign) {
+        crossings++;
+        lastSign = currentSign;
+      }
+    }
+    
+    // Frequency = (crossings / 2) / (duration in seconds)
+    const duration = samples.length / sampleRate;
+    return (crossings / 2) / duration;
+  }
+
+  private measureAmplitude(samples: number[]): number {
+    // Peak amplitude (maximum absolute value)
+    return Math.max(...samples.map(s => Math.abs(s)));
+  }
+
+  private measurePeakToPeak(samples: number[]): number {
+    const max = Math.max(...samples);
+    const min = Math.min(...samples);
+    return max - min;
+  }
+
+  private measureRMS(samples: number[]): number {
+    // Root Mean Square calculation
+    const sumSquares = samples.reduce((sum, sample) => sum + sample * sample, 0);
+    return Math.sqrt(sumSquares / samples.length);
+  }
+
+  private measureDutyCycle(samples: number[]): number {
+    // For digital signals, measure time above threshold vs total time
+    const threshold = 0.0; // Zero crossing threshold
+    let highTime = 0;
+    
+    for (const sample of samples) {
+      if (sample > threshold) {
+        highTime++;
+      }
+    }
+    
+    return (highTime / samples.length) * 100; // Return as percentage
+  }
+
+  private calculateStatistics(samples: number[], measurement: number): any {
+    // Calculate basic statistics based on actual sample data
+    const mean = samples.reduce((sum, s) => sum + s, 0) / samples.length;
+    const variance = samples.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / samples.length;
+    const std = Math.sqrt(variance);
+    
+    return {
+      min: Math.min(...samples),
+      max: Math.max(...samples),
+      mean: mean,
+      std: std
+    };
   }
 }
 
@@ -326,17 +447,82 @@ class MeasurementAnalyzer {
  */
 class ProtocolDecoder {
   async decodeProtocol(waveformData: any, protocol: string, settings: any): Promise<any> {
+    const samples = waveformData.channels[0] || [];
+    const sampleRate = waveformData.sample_rate || 44100;
+    
+    if (samples.length === 0) {
+      throw new Error('No signal data available for protocol decoding');
+    }
+
+    switch (protocol.toLowerCase()) {
+      case 'uart':
+        return this.decodeUART(samples, sampleRate, settings);
+      default:
+        // Return mock data for unsupported protocols
+        return {
+          protocol: protocol,
+          decoded_data: [
+            { timestamp: 0.001, type: "start", data: null },
+            { timestamp: 0.002, type: "data", data: "0x42" },
+            { timestamp: 0.003, type: "data", data: "0x43" },
+            { timestamp: 0.004, type: "stop", data: null }
+          ],
+          settings_used: settings,
+          statistics: {
+            total_frames: 2,
+            errors: 0,
+            timing_violations: 0
+          }
+        };
+    }
+  }
+
+  private decodeUART(samples: number[], sampleRate: number, settings: any): any {
+    const baudRate = settings.baud_rate || 9600;
+    const samplesPerBit = Math.floor(sampleRate / baudRate);
+    const threshold = 0.0; // Digital threshold
+    
+    // Convert analog samples to digital bits
+    const digitalBits = [];
+    for (let i = 0; i < samples.length; i += samplesPerBit) {
+      const bitSamples = samples.slice(i, i + samplesPerBit);
+      const avgLevel = bitSamples.reduce((sum, s) => sum + s, 0) / bitSamples.length;
+      digitalBits.push(avgLevel > threshold ? 1 : 0);
+    }
+    
+    // Simple UART frame extraction (start bit, 8 data bits, stop bit)
+    const decodedData = [];
+    let frameCount = 0;
+    
+    for (let i = 0; i < digitalBits.length - 10; i++) {
+      if (digitalBits[i] === 0) { // Start bit (low)
+        const dataBits = digitalBits.slice(i + 1, i + 9);
+        const stopBit = digitalBits[i + 9];
+        
+        if (stopBit === 1) { // Valid stop bit
+          let byteValue = 0;
+          for (let j = 0; j < 8; j++) {
+            byteValue |= (dataBits[j] << j);
+          }
+          
+          decodedData.push({
+            timestamp: (i * samplesPerBit) / sampleRate,
+            type: "data",
+            data: `0x${byteValue.toString(16).toUpperCase().padStart(2, '0')}`
+          });
+          frameCount++;
+        }
+        
+        i += 9; // Skip to next potential frame
+      }
+    }
+    
     return {
-      protocol: protocol,
-      decoded_data: [
-        { timestamp: 0.001, type: "start", data: null },
-        { timestamp: 0.002, type: "data", data: "0x42" },
-        { timestamp: 0.003, type: "data", data: "0x43" },
-        { timestamp: 0.004, type: "stop", data: null }
-      ],
+      protocol: "uart",
+      decoded_data: decodedData,
       settings_used: settings,
       statistics: {
-        total_frames: 2,
+        total_frames: frameCount,
         errors: 0,
         timing_violations: 0
       }
@@ -352,9 +538,14 @@ const measurementAnalyzer = new MeasurementAnalyzer();
 const protocolDecoder = new ProtocolDecoder();
 
 // Initialize hardware with configuration
-function initializeHardware(config: Partial<Config> = {}) {
+async function initializeHardware(config: Partial<Config> = {}): Promise<void> {
   hardware = new HardwareInterface(config);
-  return hardware.initialize().catch(logger.error);
+  try {
+    await hardware.initialize();
+  } catch (error) {
+    logger.error('Hardware initialization failed:', error);
+    throw error; // Re-throw to let caller handle the error
+  }
 }
 
 // Read configuration from environment variables
@@ -375,7 +566,7 @@ if (isMCPMode) {
 logger.log("🔧 Configuration loaded:", envConfig);
 
 // Initialize with environment configuration
-initializeHardware(envConfig);
+initializeHardware(envConfig).catch(logger.error);
 
 // Create MCP server instance
 const server = new McpServer({
