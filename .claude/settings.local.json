@@ -31,7 +31,13 @@
       "Bash(npm run:*)",
       "Bash(timeout:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)",
+      "Bash(HARDWARE_INTERFACE=microphone AUDIO_SAMPLE_RATE=44100 DEBUG=false timeout 5 npm run start)",
+      "Bash(HARDWARE_INTERFACE=microphone AUDIO_SAMPLE_RATE=44100 timeout 5 npm run start)",
+      "Bash(HARDWARE_INTERFACE=microphone AUDIO_SAMPLE_RATE=44100 MCP_MODE=false timeout 5 node dist/index.js)",
+      "Bash(HARDWARE_INTERFACE=microphone AUDIO_SAMPLE_RATE=44100 MCP_MODE=true timeout 5 node dist/index.js)"
     ],
     "deny": []
   }

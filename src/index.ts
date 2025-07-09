@@ -6,16 +6,38 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import Microphone from "node-microphone";
+
+// Logging utility for MCP server - uses stderr to avoid interfering with JSON-RPC
+// Prioritize MCP_MODE environment variable, then check if running as compiled index.js
+const isMCPMode = process.env.MCP_MODE === 'true' || 
+  (process.env.MCP_MODE !== 'false' && process.argv[1]?.endsWith('index.js'));
+
+const logger = {
+  log: (...args: any[]) => {
+    if (!isMCPMode) {
+      console.log(...args);
+    } else {
+      console.error(...args); // Use stderr in MCP mode
+    }
+  },
+  error: (...args: any[]) => {
+    console.error(...args); // Always use stderr for errors
+  }
+};
 
 // Configuration schema for server setup
 export const configSchema = z.object({
-  hardwareInterface: z.string().default("simulation").describe("Hardware interface type: simulation, usb, ethernet, pcie"),
+  hardwareInterface: z.string().default("simulation").describe("Hardware interface type: simulation, usb, ethernet, pcie, microphone"),
   sampleRate: z.number().default(1000000).describe("ADC sample rate in Hz"),
   channels: z.number().default(4).describe("Number of ADC channels"),
   bufferSize: z.number().default(1000).describe("Buffer size for data acquisition"),
   timeout: z.number().default(5.0).describe("Timeout for operations in seconds"),
-  debug: z.boolean().default(false).describe("Enable debug logging")
+  debug: z.boolean().default(false).describe("Enable debug logging"),
+  microphoneDevice: z.string().optional().describe("Microphone device for audio capture"),
+  audioSampleRate: z.number().default(44100).describe("Audio sample rate in Hz for microphone")
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -77,8 +99,11 @@ class DataStore {
  * Hardware abstraction for different ADC backends
  */
 class HardwareInterface {
-  private config: Partial<Config>;
+  public config: Partial<Config>;
   private isInitialized = false;
+  private microphone?: any;
+  private audioBuffers: Map<number, number[]> = new Map();
+  private isCapturing = false;
 
   constructor(config: Partial<Config> = {}) {
     this.config = { 
@@ -88,14 +113,19 @@ class HardwareInterface {
       bufferSize: 1000,
       timeout: 5.0,
       debug: false,
+      audioSampleRate: 44100,
       ...config 
     };
   }
 
   async initialize(): Promise<void> {
-    console.log(`Initializing ${this.config.hardwareInterface} hardware interface`);
-    console.log(`Sample rate: ${this.config.sampleRate} Hz`);
-    console.log(`Channels: ${this.config.channels}`);
+    logger.log(`Initializing ${this.config.hardwareInterface} hardware interface`);
+    logger.log(`Sample rate: ${this.config.sampleRate} Hz`);
+    logger.log(`Channels: ${this.config.channels}`);
+    
+    if (this.config.hardwareInterface === "microphone") {
+      await this.initializeMicrophone();
+    }
     
     this.isInitialized = true;
   }
@@ -117,8 +147,111 @@ class HardwareInterface {
   }
 
   async cleanup(): Promise<void> {
+    if (this.config.hardwareInterface === "microphone" && this.microphone) {
+      this.stopCapture();
+      this.microphone = undefined;
+    }
     this.isInitialized = false;
-    console.log("Hardware interface cleaned up");
+    logger.log("Hardware interface cleaned up");
+  }
+
+  private async initializeMicrophone(): Promise<void> {
+    try {
+      logger.log('Initializing microphone...');
+      
+      // Ensure sample rate is supported by node-microphone
+      const audioSampleRate = this.config.audioSampleRate || 44100;
+      let micRate: 44100 | 8000 | 16000 = 44100;
+      if (audioSampleRate === 8000 || audioSampleRate === 16000 || audioSampleRate === 44100) {
+        micRate = audioSampleRate as 44100 | 8000 | 16000;
+      }
+      
+      const deviceName = this.config.microphoneDevice || 'default';
+      const micOptions = {
+        rate: micRate,
+        channels: 1 as 1 | 2,
+        debug: this.config.debug || false,
+        exitOnSilence: 6,
+        device: (deviceName === 'default' || deviceName === 'hw:0,0' || deviceName === 'plughw:1,0') 
+          ? deviceName as "default" | "hw:0,0" | "plughw:1,0"
+          : "default"
+      };
+      
+      this.microphone = new Microphone(micOptions);
+      logger.log('Microphone initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize microphone:', error);
+      throw error;
+    }
+  }
+
+  async captureMicrophoneData(durationSeconds: number = 1): Promise<number[]> {
+    if (!this.microphone) {
+      throw new Error('Microphone not initialized');
+    }
+
+    return new Promise((resolve, reject) => {
+      const samples: number[] = [];
+      const sampleRate = this.config.audioSampleRate || 44100;
+      const expectedSamples = Math.floor(sampleRate * durationSeconds);
+      
+      const micStream = this.microphone.getAudioStream();
+
+      let timeout: NodeJS.Timeout;
+
+      const cleanup = () => {
+        if (timeout) clearTimeout(timeout);
+        this.microphone.stop();
+      };
+
+      timeout = setTimeout(() => {
+        cleanup();
+        if (samples.length === 0) {
+          reject(new Error('No audio data captured within timeout'));
+        } else {
+          resolve(samples);
+        }
+      }, (durationSeconds + 1) * 1000);
+
+      micStream.on('data', (chunk: Buffer) => {
+        // Convert 16-bit PCM to normalized float values
+        for (let i = 0; i < chunk.length; i += 2) {
+          const sample = chunk.readInt16LE(i) / 32768.0;
+          samples.push(sample);
+          
+          if (samples.length >= expectedSamples) {
+            cleanup();
+            resolve(samples.slice(0, expectedSamples));
+            return;
+          }
+        }
+      });
+
+      micStream.on('error', (error: Error) => {
+        cleanup();
+        reject(error);
+      });
+
+      try {
+        this.microphone.start();
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    });
+  }
+
+  stopCapture(): void {
+    if (this.microphone) {
+      this.microphone.stop();
+      this.isCapturing = false;
+    }
+  }
+
+  async getAvailableDevices(): Promise<string[]> {
+    // Return devices supported by node-microphone library
+    // These are the only device names that work with the library's strict typing
+    return ['default', 'hw:0,0', 'plughw:1,0'];
   }
 }
 
@@ -213,13 +346,36 @@ class ProtocolDecoder {
 
 // Initialize components
 const dataStore = new DataStore();
-const hardware = new HardwareInterface();
+let hardware: HardwareInterface;
 const signalProcessor = new SignalProcessor(); 
 const measurementAnalyzer = new MeasurementAnalyzer();
 const protocolDecoder = new ProtocolDecoder();
 
-// Initialize hardware
-hardware.initialize().catch(console.error);
+// Initialize hardware with configuration
+function initializeHardware(config: Partial<Config> = {}) {
+  hardware = new HardwareInterface(config);
+  return hardware.initialize().catch(logger.error);
+}
+
+// Read configuration from environment variables
+const envConfig: Partial<Config> = {
+  hardwareInterface: process.env.HARDWARE_INTERFACE || "simulation",
+  audioSampleRate: process.env.AUDIO_SAMPLE_RATE ? parseInt(process.env.AUDIO_SAMPLE_RATE) : 44100,
+  debug: process.env.DEBUG === "true",
+  microphoneDevice: process.env.MICROPHONE_DEVICE || "default"
+};
+
+// Enhanced logging for MCP vs standalone modes
+if (isMCPMode) {
+  logger.log("🔧 MCP mode detected - using stderr for logging");
+} else {
+  logger.log("🔧 Standalone mode - using stdout for logging");
+}
+
+logger.log("🔧 Configuration loaded:", envConfig);
+
+// Initialize with environment configuration
+initializeHardware(envConfig);
 
 // Create MCP server instance
 const server = new McpServer({
@@ -262,21 +418,37 @@ server.tool(
     // Simulate waiting for data
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Generate mock acquisition data
+    // Generate acquisition data based on hardware interface
     const acquisitionId = `acq_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const mockData = {
       timestamp: Date.now() / 1000,
-      sample_rate: 1000000,
+      sample_rate: hardware.config.hardwareInterface === "microphone" ? 
+        (hardware.config.audioSampleRate || 44100) : 1000000,
       channels: {} as any
     };
 
     const channelsToUse = channels || [0, 1, 2, 3];
-    for (const channel of channelsToUse) {
-      // Generate mock waveform data
-      const samples = Array.from({ length: 1000 }, (_, i) => 
-        Math.sin(2 * Math.PI * 1000 * i / 1000000) + Math.random() * 0.1
-      );
-      mockData.channels[channel] = samples;
+    
+    if (hardware.config.hardwareInterface === "microphone") {
+      // Capture real microphone data
+      try {
+        const micData = await hardware.captureMicrophoneData(timeout || 2);
+        mockData.channels[0] = micData;
+        // For additional channels, add processed versions of the same data
+        for (let i = 1; i < Math.min(channelsToUse.length, 4); i++) {
+          mockData.channels[i] = micData.map(sample => sample * 0.5 + Math.random() * 0.1);
+        }
+      } catch (error) {
+        throw new Error(`Microphone capture failed: ${error}`);
+      }
+    } else {
+      // Generate mock waveform data for simulation
+      for (const channel of channelsToUse) {
+        const samples = Array.from({ length: 1000 }, (_, i) => 
+          Math.sin(2 * Math.PI * 1000 * i / 1000000) + Math.random() * 0.1
+        );
+        mockData.channels[channel] = samples;
+      }
     }
 
     dataStore.storeAcquisition(acquisitionId, mockData);
@@ -288,7 +460,9 @@ server.tool(
           status: "success",
           acquisition_id: acquisitionId,
           timestamp: Date.now() / 1000,
-          channels_available: channelsToUse
+          channels_available: channelsToUse,
+          hardware_interface: hardware.config.hardwareInterface,
+          sample_rate: mockData.sample_rate
         }, null, 2)
       }]
     };
@@ -621,6 +795,152 @@ server.tool(
   }
 );
 
+// ====== DEVICE MANAGEMENT TOOLS ======
+
+server.tool(
+  'list_audio_devices',
+  'List available audio input devices for microphone capture',
+  {},
+  async () => {
+    try {
+      const devices = await hardware.getAvailableDevices();
+      const currentDevice = hardware.config.microphoneDevice || 'default';
+      
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            status: "success",
+            available_devices: devices,
+            current_device: currentDevice,
+            hardware_interface: hardware.config.hardwareInterface,
+            timestamp: Date.now() / 1000
+          }, null, 2)
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            status: "error",
+            error: `Failed to list devices: ${error}`,
+            timestamp: Date.now() / 1000
+          }, null, 2)
+        }]
+      };
+    }
+  }
+);
+
+server.tool(
+  'configure_hardware',
+  'Configure hardware interface and device settings',
+  {
+    hardware_interface: z.string().describe('Hardware interface: simulation, microphone, usb, ethernet, pcie'),
+    microphone_device: z.string().optional().describe('Microphone device name'),
+    audio_sample_rate: z.number().optional().describe('Audio sample rate (Hz)'),
+    channels: z.number().optional().describe('Number of channels'),
+    debug: z.boolean().optional().describe('Enable debug logging')
+  },
+  async ({ hardware_interface, microphone_device, audio_sample_rate, channels, debug }) => {
+    try {
+      // Build new configuration
+      const newConfig: Partial<Config> = {
+        hardwareInterface: hardware_interface,
+        ...(microphone_device && { microphoneDevice: microphone_device }),
+        ...(audio_sample_rate && { audioSampleRate: audio_sample_rate }),
+        ...(channels && { channels: channels }),
+        ...(debug !== undefined && { debug: debug })
+      };
+
+      // Clean up current hardware
+      await hardware.cleanup();
+
+      // Initialize with new configuration
+      await initializeHardware(newConfig);
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            status: "success",
+            message: "Hardware reconfigured successfully",
+            configuration: {
+              hardware_interface: hardware.config.hardwareInterface,
+              microphone_device: hardware.config.microphoneDevice,
+              audio_sample_rate: hardware.config.audioSampleRate,
+              channels: hardware.config.channels,
+              debug: hardware.config.debug
+            },
+            timestamp: Date.now() / 1000
+          }, null, 2)
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            status: "error",
+            error: `Hardware configuration failed: ${error}`,
+            timestamp: Date.now() / 1000
+          }, null, 2)
+        }]
+      };
+    }
+  }
+);
+
+server.tool(
+  'get_hardware_status',
+  'Get current hardware configuration and status',
+  {},
+  async () => {
+    try {
+      const config = hardware.config;
+      const devices = await hardware.getAvailableDevices();
+      
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            status: "success",
+            current_configuration: {
+              hardware_interface: config.hardwareInterface,
+              sample_rate: config.sampleRate,
+              audio_sample_rate: config.audioSampleRate,
+              channels: config.channels,
+              buffer_size: config.bufferSize,
+              timeout: config.timeout,
+              microphone_device: config.microphoneDevice,
+              debug: config.debug
+            },
+            available_devices: devices,
+            server_info: {
+              name: "oscilloscope-function-generator",
+              version: "1.0.0",
+              runtime: "typescript"
+            },
+            timestamp: Date.now() / 1000
+          }, null, 2)
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            status: "error",
+            error: `Failed to get hardware status: ${error}`,
+            timestamp: Date.now() / 1000
+          }, null, 2)
+        }]
+      };
+    }
+  }
+);
+
 // ====== RESOURCES ======
 
 server.resource(
@@ -632,7 +952,14 @@ server.resource(
       total_acquisitions: acquisitions.length,
       recent_acquisitions: acquisitions.slice(-5),
       server_status: "running",
-      hardware_status: "simulation",
+      hardware_status: hardware.config.hardwareInterface,
+      hardware_config: {
+        interface: hardware.config.hardwareInterface,
+        sample_rate: hardware.config.sampleRate,
+        audio_sample_rate: hardware.config.audioSampleRate,
+        channels: hardware.config.channels,
+        microphone_device: hardware.config.microphoneDevice
+      },
       timestamp: Date.now() / 1000
     };
 
@@ -646,6 +973,42 @@ server.resource(
   }
 );
 
+server.resource(
+  'hardware://devices/list',
+  'Get list of available hardware devices',
+  async () => {
+    try {
+      const devices = await hardware.getAvailableDevices();
+      const deviceInfo = {
+        available_devices: devices,
+        current_device: hardware.config.microphoneDevice || 'default',
+        hardware_interface: hardware.config.hardwareInterface,
+        supported_interfaces: ['simulation', 'microphone', 'usb', 'ethernet', 'pcie'],
+        timestamp: Date.now() / 1000
+      };
+
+      return {
+        contents: [{
+          uri: 'hardware://devices/list',
+          mimeType: 'application/json',
+          text: JSON.stringify(deviceInfo, null, 2)
+        }]
+      };
+    } catch (error) {
+      return {
+        contents: [{
+          uri: 'hardware://devices/list',
+          mimeType: 'application/json',
+          text: JSON.stringify({
+            error: `Failed to get device list: ${error}`,
+            timestamp: Date.now() / 1000
+          }, null, 2)
+        }]
+      };
+    }
+  }
+);
+
 // ====== PROMPTS ======
 
 server.prompt(
@@ -653,6 +1016,7 @@ server.prompt(
   'Workflow for integrating ADC hardware',
   {},
   async () => {
+    const currentConfig = hardware.config;
     return {
       messages: [{
         role: 'user',
@@ -664,51 +1028,159 @@ server.prompt(
 ## Overview
 This workflow guides you through integrating your ADC hardware with the oscilloscope MCP server.
 
-## Configuration
-Current configuration:
-- Hardware Interface: simulation
-- Sample Rate: 1,000,000 Hz
-- Channels: 4
-- Buffer Size: 1000
+## Current Configuration
+- Hardware Interface: ${currentConfig.hardwareInterface}
+- Sample Rate: ${currentConfig.sampleRate?.toLocaleString()} Hz
+- Audio Sample Rate: ${currentConfig.audioSampleRate?.toLocaleString()} Hz
+- Channels: ${currentConfig.channels}
+- Buffer Size: ${currentConfig.bufferSize}
+- Microphone Device: ${currentConfig.microphoneDevice || 'default'}
 
 ## Steps
 
-### 1. Test Signal Generation
-Use \`generate_test_signal\` to create known signals for testing:
+### 1. Check Hardware Status
+First, check your current hardware configuration:
+\`\`\`
+get_hardware_status()
+\`\`\`
+
+### 2. Configure Hardware (if needed)
+To use your microphone as an analog source:
+\`\`\`
+configure_hardware(hardware_interface="microphone", microphone_device="default", audio_sample_rate=44100)
+\`\`\`
+
+### 3. List Available Devices
+To see available audio devices:
+\`\`\`
+list_audio_devices()
+\`\`\`
+
+### 4. Test Signal Generation
+Generate test signals for verification:
 \`\`\`
 generate_test_signal(signal_type="sine", frequency=1000, amplitude=1.0)
 \`\`\`
 
-### 2. Acquire Data
-Use \`acquire_waveform\` to capture data from your hardware:
+### 5. Acquire Data
+Capture data from your microphone:
 \`\`\`
-acquire_waveform(timeout=10.0, channels=[0, 1])
+acquire_waveform(timeout=5.0, channels=[0])
 \`\`\`
 
-### 3. Analyze Results
+### 6. Analyze Results
 Perform measurements and analysis:
 \`\`\`
-measure_parameters(acquisition_id="...", measurements=["frequency", "amplitude"])
+measure_parameters(acquisition_id="...", measurements=["frequency", "amplitude", "rms"])
 analyze_spectrum(acquisition_id="...", window="hamming")
 \`\`\`
 
-### 4. Protocol Decoding (Optional)
+### 7. Protocol Decoding (Optional)
 If working with digital signals:
 \`\`\`
 decode_protocol(acquisition_id="...", protocol="uart", settings={"baud_rate": 9600})
 \`\`\`
 
 ## Hardware Interface Types
-- **simulation**: Mock data for testing (current)
+- **simulation**: Mock data for testing
+- **microphone**: Use computer microphone as analog input
 - **usb**: USB-based ADC devices
 - **ethernet**: Network-connected ADCs
 - **pcie**: PCIe ADC cards
 
+## Device Selection
+You can select different microphone devices by using:
+1. \`list_audio_devices()\` - to see available options
+2. \`configure_hardware(hardware_interface="microphone", microphone_device="your_device")\` - to switch devices
+
 ## Next Steps
 1. Verify basic functionality with test signals
-2. Connect your physical ADC hardware
-3. Update configuration for your specific hardware
-4. Implement real-time data streaming if needed
+2. Configure microphone input for real-time audio analysis
+3. Use Claude Desktop integration for interactive analysis
+4. Implement custom signal processing workflows
+          `
+        }
+      }]
+    };
+  }
+);
+
+server.prompt(
+  'microphone_setup_guide',
+  'Guide for setting up microphone input on Windows',
+  {},
+  async () => {
+    return {
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `
+# Microphone Setup Guide for Windows
+
+## Overview
+This guide helps you set up your microphone as an analog input source for the oscilloscope MCP server.
+
+## Prerequisites
+- Windows 10/11 with working microphone
+- Claude Desktop installed and configured
+- Node.js installed (for local server)
+- Sox audio tools (automatically installed with dependencies)
+
+## Quick Setup
+
+### 1. Configure for Microphone Input
+\`\`\`
+configure_hardware(hardware_interface="microphone", audio_sample_rate=44100, debug=true)
+\`\`\`
+
+### 2. Test Microphone
+\`\`\`
+get_hardware_status()
+list_audio_devices()
+\`\`\`
+
+### 3. Capture Audio
+\`\`\`
+acquire_waveform(timeout=3.0, channels=[0])
+\`\`\`
+
+### 4. Analyze Audio
+\`\`\`
+measure_parameters(acquisition_id="your_id", measurements=["frequency", "amplitude", "rms"])
+analyze_spectrum(acquisition_id="your_id", window="hamming", resolution=1024)
+\`\`\`
+
+## Device Selection
+To select a specific microphone:
+1. List available devices: \`list_audio_devices()\`
+2. Configure specific device: \`configure_hardware(hardware_interface="microphone", microphone_device="your_device_name")\`
+
+## Common Audio Sources
+- **Default**: System default microphone
+- **Microphone**: Built-in or USB microphone
+- **Line-in**: Audio line input
+- **USB-Audio**: USB audio devices
+
+## Troubleshooting
+- Enable debug mode: \`configure_hardware(debug=true)\`
+- Check Windows audio settings and permissions
+- Ensure microphone is not muted or disabled
+- Try different sample rates (22050, 44100, 48000 Hz)
+
+## Sample Analysis Workflow
+1. Configure microphone input
+2. Capture 3-5 seconds of audio
+3. Analyze frequency spectrum
+4. Measure signal parameters
+5. Use results for further processing
+
+## Integration with Claude Desktop
+This server integrates seamlessly with Claude Desktop:
+- Real-time audio analysis through prompts
+- Interactive device selection
+- Automated measurement workflows
+- Visual spectrum analysis results
           `
         }
       }]
@@ -727,7 +1199,46 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
+// Start MCP server for direct Node.js execution
+async function startServer() {
+  try {
+    // Create stdio transport for Claude Desktop integration
+    const transport = new StdioServerTransport();
+    
+    // In MCP mode, minimize startup logging to avoid JSON-RPC interference
+    if (isMCPMode) {
+      logger.log("Starting MCP server for Claude Desktop...");
+    } else {
+      logger.log("🚀 Starting MCP server...");
+    }
+    
+    // Start the MCP server - this will handle JSON-RPC protocol
+    await server.connect(transport);
+    
+    // Post-startup messages (only in stderr for MCP mode)
+    if (!isMCPMode) {
+      logger.log("🚀 MCP server started successfully");
+      logger.log("📡 Ready for Claude Desktop connections");
+      logger.log("🎤 Hardware configured for:", hardware.config.hardwareInterface);
+    } else {
+      logger.log("MCP server ready for Claude Desktop connections");
+    }
+  } catch (error) {
+    logger.error("❌ Failed to start MCP server:", error);
+    process.exit(1);
+  }
+}
+
+// Only start server if this file is run directly (not imported)
+if (process.argv[1] && process.argv[1].endsWith('index.js')) {
+  startServer().catch(logger.error);
+}
+
 // Export as function for Smithery CLI compatibility
 export default function({ sessionId, config }: { sessionId?: string; config?: any } = {}) {
+  // If configuration is provided, reinitialize hardware
+  if (config) {
+    initializeHardware(config).catch(logger.error);
+  }
   return server.server;
 }

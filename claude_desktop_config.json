@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "oscilloscope": {
+      "command": "node",
+      "args": ["REPLACE_WITH_FULL_PATH\\dist\\index.js"],
+      "env": {
+        "HARDWARE_INTERFACE": "microphone",
+        "AUDIO_SAMPLE_RATE": "44100",
+        "DEBUG": "false",
+        "MCP_MODE": "true"
+      }
+    }
+  }
+}

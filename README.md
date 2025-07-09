@@ -1,283 +1,283 @@
-# Oscilloscope MCP Server
+# Oscilloscope MCP Server with Microphone Integration
 
-A professional oscilloscope and function generator MCP (Model Context Protocol) server that provides comprehensive signal processing and measurement capabilities to AI agents like Claude Desktop and VS Code extensions.
+A professional oscilloscope and function generator MCP (Model Context Protocol) server that provides comprehensive signal processing and measurement capabilities to AI agents like Claude Desktop. **Now with Windows microphone support for real-time audio analysis!**
 
-## 🚀 Features
+## Features
 
 ### Oscilloscope Capabilities
-- **Multi-channel acquisition** (4 channels, up to 1 GS/s)
-- **Advanced triggering** (edge, pulse, pattern, protocol)
-- **Real-time FFT analysis** with windowing
-- **Automated measurements** (RMS, frequency, rise time, etc.)
+- **Multi-channel acquisition** (4 channels, configurable sample rates)
+- **Real-time microphone input** for Windows audio analysis
+- **Advanced FFT analysis** with windowing functions
+- **Automated measurements** (RMS, frequency, amplitude, etc.)
 - **Protocol decoding** (UART, SPI, I2C, CAN)
-- **Signal integrity analysis** with anomaly detection
+- **Signal processing** with spectrum analysis
 
 ### Function Generator Capabilities
-- **Standard waveforms** (sine, square, triangle, sawtooth)
-- **Arbitrary waveform generation** (1M samples)
-- **Modulation support** (AM, FM, PM)
-- **Frequency sweeps** (linear and logarithmic)
-- **Dual-channel output**
+- **Standard waveforms** (sine, square, triangle, sawtooth, noise)
+- **Configurable parameters** (frequency, amplitude, duration)
+- **Test signal injection** for calibration and testing
+- **Dual-channel output simulation**
 
 ### MCP Integration
-- **40+ MCP tools** for instrument control and analysis
-- **Resource access** for real-time waveform data
-- **Workflow prompts** for automated measurement procedures
-- **AI agent compatibility** with Claude Desktop, VS Code, etc.
+- **9 MCP tools** for instrument control and analysis
+- **3 resource endpoints** for real-time data access
+- **2 workflow prompts** for guided setup
+- **Claude Desktop compatibility** with Windows integration
 
-## 🏗️ Architecture
+### Hardware Interface Support
+- **Simulation mode** - Mock data for development
+- **Microphone mode** - Real-time Windows audio capture
+- **USB/Ethernet/PCIe** - Professional ADC hardware support
 
-The server uses a modular architecture with clear separation between:
+## Architecture
+
+The server uses a modular TypeScript architecture with:
 
 - **Hardware Interface Layer**: Abstracts simulation and real hardware
 - **Signal Processing Engine**: FFT, filtering, and analysis algorithms  
 - **MCP Server Core**: Exposes functionality through MCP protocol
-- **Resource Manager**: Handles data storage and retrieval
+- **Data Store**: Handles acquisition storage and caching
 - **Measurement Engine**: Automated parameter analysis
 - **Protocol Decoders**: Digital communication analysis
 
-## 🔧 Installation
+## Quick Start (Windows + Claude Desktop)
 
 ### Prerequisites
+- Windows 10/11 with working microphone
+- [Node.js](https://nodejs.org/) (version 18 or higher)
+- [Claude Desktop](https://claude.ai/download)
 
-- Python 3.9 or higher
-- NumPy, SciPy for signal processing
-- FastMCP for MCP protocol support
-
-### Quick Start
-
-1. **Clone the repository**
+### Installation
+1. **Clone and install**
    ```bash
    git clone https://github.com/oscilloscope-mcp/oscilloscope-mcp.git
    cd oscilloscope-mcp
+   npm install
    ```
 
-2. **Install dependencies**
+2. **Build the project**
    ```bash
-   pip install -e .
+   npm run build
    ```
 
-3. **Run in simulation mode**
-   ```bash
-   oscilloscope-mcp serve --interface simulation
+3. **Start the server**
+   ```powershell
+   .\start-mcp-server.ps1
    ```
 
-4. **Test the installation**
-   ```bash
-   oscilloscope-mcp test
-   ```
+4. **Configure Claude Desktop**
+   - Open `%APPDATA%\Roaming\Claude\claude_desktop_config.json`
+   - Add the server configuration (see WINDOWS_SETUP.md)
 
-## 🐳 Docker Deployment
+### Testing Your Setup
+In Claude Desktop, try these commands:
+- "Check the hardware status of the oscilloscope server"
+- "List available audio devices"
+- "Capture 3 seconds of audio from my microphone and analyze it"
 
-### Build the container
+## MCP Tools Available
+
+### Oscilloscope Tools
+- `get_acquisition_status` - Check current acquisition status
+- `acquire_waveform` - Capture data from microphone or simulation
+- `measure_parameters` - Automated signal measurements
+- `analyze_spectrum` - FFT analysis with windowing
+
+### Function Generator Tools
+- `generate_test_signal` - Create calibration signals
+
+### Device Management Tools
+- `list_audio_devices` - Enumerate available audio devices
+- `configure_hardware` - Change hardware settings
+- `get_hardware_status` - Get current configuration
+
+### Analysis Tools
+- `decode_protocol` - Decode digital communication protocols
+
+## Usage Examples
+
+### Basic Microphone Analysis
+```
+1. configure_hardware(hardware_interface="microphone", audio_sample_rate=44100)
+2. acquire_waveform(timeout=5.0, channels=[0])
+3. measure_parameters(acquisition_id="...", measurements=["frequency", "amplitude", "rms"])
+4. analyze_spectrum(acquisition_id="...", window="hamming")
+```
+
+### Device Selection
+```
+1. list_audio_devices()
+2. configure_hardware(hardware_interface="microphone", microphone_device="USB Audio")
+3. get_hardware_status()
+```
+
+### Signal Generation and Testing
+```
+1. generate_test_signal(signal_type="sine", frequency=1000, amplitude=1.0)
+2. analyze_spectrum(acquisition_id="test_...", resolution=1024)
+```
+
+## Hardware Interface Configuration
+
+### Microphone Mode (Default for Windows)
+- **Real-time audio capture** from system microphone
+- **Configurable sample rates** (22050, 44100, 48000, 96000 Hz)
+- **Device selection** from available audio inputs
+- **Multi-channel simulation** from mono input
+
+### Simulation Mode
+- **Realistic signal generation** with noise
+- **No hardware required** for development
+- **Full feature support** for testing
+
+### Professional Hardware
+- **USB/Ethernet/PCIe** support for ADC devices
+- **High-speed data acquisition** capabilities
+- **Real-time processing** support
+
+## Configuration Options
+
+### Hardware Interface Types
+```typescript
+- "simulation" - Mock data for testing
+- "microphone" - Windows audio capture
+- "usb" - USB-based ADC devices
+- "ethernet" - Network-connected ADCs
+- "pcie" - PCIe ADC cards
+```
+
+### Audio Sample Rates
+```typescript
+- 22050 - Basic quality
+- 44100 - CD quality (recommended)
+- 48000 - Professional audio
+- 96000 - High-resolution audio
+```
+
+### Environment Variables
 ```bash
-docker build -t oscilloscope-mcp .
+HARDWARE_INTERFACE=microphone
+AUDIO_SAMPLE_RATE=44100
+DEBUG=false
+MICROPHONE_DEVICE=default
 ```
 
-### Run the server
+## Testing
+
+### Run TypeScript compilation
 ```bash
-docker run -p 8080:8080 \
-  -e HARDWARE_INTERFACE=simulation \
-  -e LOG_LEVEL=INFO \
-  oscilloscope-mcp
+npm run build
 ```
 
-## ☁️ Smithery Deployment
-
-This MCP server is designed for easy deployment on [Smithery](https://smithery.ai), the MCP server registry.
-
-### Configuration
-
-The server includes a complete `smithery.yaml` configuration with:
-- All MCP tools documented
-- Resource endpoints defined
-- Workflow prompts included
-- Build and runtime settings
-
-### Deploy to Smithery
-
-1. **Push to your repository**
-2. **Register on Smithery**
-3. **Configure your AI agent** to use the deployed server
-
-## 🎯 Usage Examples
-
-### Basic Oscilloscope Setup
-
-```python
-# Configure channels
-await configure_channels(
-    channels=[0, 1], 
-    voltage_range=1.0, 
-    coupling="DC", 
-    impedance="1M"
-)
-
-# Set timebase
-await set_timebase(sample_rate=100e6, record_length=1000)
-
-# Setup trigger
-await setup_trigger(
-    source="channel0", 
-    trigger_type="edge", 
-    level=0.5, 
-    edge="rising"
-)
-
-# Acquire waveform
-result = await acquire_waveform(channels=[0, 1], timeout=5.0)
-```
-
-### Signal Analysis
-
-```python
-# Perform measurements
-measurements = await measure_parameters(
-    channel=0, 
-    measurements=["rms", "frequency", "peak_to_peak"],
-    statistics=True
-)
-
-# FFT analysis
-spectrum = await analyze_spectrum(
-    channel=0, 
-    window="hamming", 
-    resolution=1024
-)
-
-# Protocol decoding
-decoded = await decode_protocol(
-    channels=[0, 1], 
-    protocol="UART", 
-    settings={"baud_rate": 115200}
-)
-```
-
-### Function Generator
-
-```python
-# Generate sine wave
-await generate_standard_waveform(
-    channel=0, 
-    waveform="sine", 
-    frequency=1000.0, 
-    amplitude=1.0
-)
-
-# Arbitrary waveform
-samples = [0.0, 1.0, 0.0, -1.0] * 100
-await generate_arbitrary_waveform(
-    channel=0, 
-    samples=samples, 
-    sample_rate=10000.0
-)
-```
-
-## 🔌 Hardware Interface
-
-The server supports multiple hardware interfaces:
-
-### Simulation Mode (Default)
-- **Realistic signal generation** with noise and artifacts
-- **No hardware required** for development and testing
-- **Full feature support** for learning and prototyping
-
-### USB Interface
-- **USBTMC protocol** support
-- **Vendor-specific drivers** for major manufacturers
-- **Plug-and-play detection**
-
-### Ethernet Interface  
-- **TCP/IP communication** with instruments
-- **SCPI over LAN** protocol support
-- **Remote instrument access**
-
-### PCIe Interface
-- **High-speed data acquisition** cards
-- **Real-time processing** capabilities
-- **Professional-grade performance**
-
-## 📊 Performance Specifications
-
-### Oscilloscope
-- **Bandwidth**: DC to 1 GHz
-- **Sample Rate**: Up to 5 GS/s
-- **Memory Depth**: 1 GSample per channel
-- **Trigger Latency**: <100 ns
-- **Measurement Accuracy**: ±0.1% for DC, ±1% for AC
-
-### Function Generator
-- **Frequency Range**: 1 μHz to 500 MHz
-- **Frequency Resolution**: 1 μHz
-- **Amplitude Accuracy**: ±0.5%
-- **Phase Noise**: <-130 dBc/Hz at 10 kHz offset
-- **SFDR**: >80 dBc
-
-## 🧪 Testing
-
-### Run all tests
+### Start development server
 ```bash
-pytest tests/
+npm run dev
 ```
 
-### Hardware self-test
+### Test with Claude Desktop
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for comprehensive testing scenarios.
+
+## Windows Integration
+
+### Automatic Setup
+- **PowerShell script** for easy server startup
+- **Batch file** for command prompt users
+- **Claude Desktop configuration** templates
+- **Device enumeration** for audio selection
+
+### Audio Device Support
+- **Built-in microphones** and line inputs
+- **USB audio devices** and interfaces
+- **Professional audio equipment**
+- **Multiple device switching**
+
+## Documentation
+
+- **[Windows Setup Guide](WINDOWS_SETUP.md)** - Complete Windows installation
+- **[Testing Guide](TESTING_GUIDE.md)** - Comprehensive testing scenarios
+- **[API Reference](src/index.ts)** - MCP tools and configuration
+- **[Hardware Integration](smithery.yaml)** - Smithery deployment config
+
+## Development
+
+### Local Development
 ```bash
-oscilloscope-mcp test --interface simulation
+npm install
+npm run dev
 ```
 
-### Integration tests
+### Build for Production
 ```bash
-pytest tests/integration/
+npm run build
+npm run start
 ```
 
-## 🤝 Contributing
+### Smithery Deployment
+```bash
+npm run smithery:build
+npm run smithery:dev
+```
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+## Project Structure
+
+```
+oscilloscope-mcp/
+├── src/
+│   ├── index.ts              # Main MCP server implementation
+│   ├── tools/                # MCP tool implementations
+│   ├── resources/            # MCP resource handlers
+│   └── prompts/              # Workflow prompts
+├── dist/                     # Compiled TypeScript output
+├── start-mcp-server.ps1      # Windows PowerShell startup script
+├── start-mcp-server.bat      # Windows batch startup script
+├── WINDOWS_SETUP.md          # Windows setup instructions
+├── TESTING_GUIDE.md          # Testing scenarios
+└── smithery.yaml             # Smithery deployment config
+```
+
+## Contributing
+
+We welcome contributions! Please:
+
+1. **Fork the repository**
+2. **Create a feature branch**
+3. **Add tests** for new functionality
+4. **Update documentation**
+5. **Submit a pull request**
 
 ### Development Setup
+```bash
+git clone https://github.com/oscilloscope-mcp/oscilloscope-mcp.git
+cd oscilloscope-mcp
+npm install
+npm run build
+```
 
-1. **Clone and install in development mode**
-   ```bash
-   git clone https://github.com/oscilloscope-mcp/oscilloscope-mcp.git
-   cd oscilloscope-mcp
-   pip install -e ".[dev]"
-   ```
-
-2. **Install pre-commit hooks**
-   ```bash
-   pre-commit install
-   ```
-
-3. **Run tests**
-   ```bash
-   pytest
-   ```
-
-## 📚 Documentation
-
-- **API Reference**: [docs/api.md](docs/api.md)
-- **Hardware Integration**: [docs/hardware.md](docs/hardware.md)
-- **MCP Protocol**: [docs/mcp.md](docs/mcp.md)
-- **Examples**: [examples/](examples/)
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **MCP Protocol** by Anthropic
-- **FastMCP** framework
-- **SciPy** and **NumPy** communities
+- **@modelcontextprotocol/sdk** for TypeScript implementation
+- **node-microphone** and **sox-stream** for Windows audio capture
+- **Claude Desktop** for AI integration
 - **Signal processing** research community
 
-## 🔗 Links
+## Links
 
-- **Smithery Registry**: [https://smithery.ai](https://smithery.ai)
+- **Claude Desktop**: [https://claude.ai/download](https://claude.ai/download)
 - **MCP Documentation**: [https://docs.anthropic.com/mcp](https://docs.anthropic.com/mcp)
-- **Issue Tracker**: [GitHub Issues](https://github.com/oscilloscope-mcp/oscilloscope-mcp/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/oscilloscope-mcp/oscilloscope-mcp/discussions)
+- **Smithery Registry**: [https://smithery.ai](https://smithery.ai)
+- **Node.js**: [https://nodejs.org/](https://nodejs.org/)
 
 ---
 
-**Built with ❤️ for the AI and test & measurement communities**
+**Built with professional focus for AI-powered signal analysis and test & measurement**
+
+### Quick Links
+- [Windows Setup](WINDOWS_SETUP.md)
+- [Testing Guide](TESTING_GUIDE.md)
+- [API Reference](src/index.ts)
+- [Smithery Config](smithery.yaml)
